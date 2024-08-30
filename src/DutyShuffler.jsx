@@ -115,6 +115,7 @@ function DutyShuffler() {
       });
     });
 
+    // Shuffle the duties
     for (let i = allDuties.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [allDuties[i], allDuties[j]] = [allDuties[j], allDuties[i]];
@@ -123,6 +124,7 @@ function DutyShuffler() {
     let dutyIndex = 0;
     const shuffledData = clonedData.map((row) => {
       const shuffledRow = { ...row };
+      let previousDuty = null;
 
       weekdays.forEach((day) => {
         const duty = row[day];
@@ -133,10 +135,24 @@ function DutyShuffler() {
           shuffledRow[day] = employeeStatus[row["Employee Name"]][day];
         } else if (fixedDuties.includes(duty)) {
           shuffledRow[day] = duty;
+          previousDuty = duty; // Set the previous duty for fixed duties
         } else {
-          shuffledRow[day] = allDuties[dutyIndex++] || duty;
+          // Ensure no same job is assigned on two consecutive days
+          let newDuty = allDuties[dutyIndex++] || duty;
+          if (newDuty === previousDuty) {
+            // If the new duty is the same as the previous day, swap with the next one
+            newDuty = allDuties[dutyIndex] || duty;
+            [allDuties[dutyIndex - 1], allDuties[dutyIndex]] = [
+              allDuties[dutyIndex],
+              allDuties[dutyIndex - 1],
+            ];
+            dutyIndex++;
+          }
+          shuffledRow[day] = newDuty;
+          previousDuty = newDuty; // Update previous duty
         }
       });
+
       return shuffledRow;
     });
 
