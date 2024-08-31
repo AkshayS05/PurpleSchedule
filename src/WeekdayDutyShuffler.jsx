@@ -75,10 +75,7 @@ function WeekdayDutyShuffler() {
             row.Friday
         );
 
-      console.log("Cleaned Data:", cleanedData);
-
       if (cleanedData.length === 0) {
-        console.warn("No valid data found after filtering.");
         return;
       }
 

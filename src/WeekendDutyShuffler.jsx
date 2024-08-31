@@ -23,9 +23,6 @@ function WeekendDutyShuffler({ onExcelUpload }) {
         header: 1,
       });
 
-      // Log the parsed data for debugging
-      console.log("Parsed Data:", parsedData);
-
       // Extract headers
       const headers = parsedData[0];
       parsedData = parsedData.slice(1); // Remove the header row
