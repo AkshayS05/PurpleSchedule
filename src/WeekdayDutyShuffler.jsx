@@ -1,70 +1,104 @@
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import "./DutyShuffler.css";
 
 function WeekdayDutyShuffler() {
   const [data, setData] = useState([]);
   const [employeeStatus, setEmployeeStatus] = useState({});
+  const [availableDuties, setAvailableDuties] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
+  const [showStats, setShowStats] = useState({
+    Monday: true,
+    Tuesday: true,
+    Wednesday: true,
+    Thursday: true,
+    Friday: true,
+  });
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
+    if (!file) {
+      console.log("No file selected.");
+      return;
+    }
+
+    console.log("File selected:", file.name);
+
     const reader = new FileReader();
     reader.onload = (event) => {
-      const binaryStr = event.target.result;
-      const workbook = XLSX.read(binaryStr, { type: "binary" });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
+      try {
+        console.log("File reading started...");
+        const arrayBuffer = event.target.result;
+        const workbook = XLSX.read(arrayBuffer, { type: "array" });
+        console.log("Workbook read:", workbook);
 
-      let parsedData = XLSX.utils.sheet_to_json(sheet, {
-        header: 1,
-      });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        console.log("Sheet name:", sheetName);
+        console.log("Sheet data:", sheet);
 
-      parsedData = parsedData.slice(1);
+        let parsedData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        console.log("Parsed data (raw):", parsedData);
 
-      const headers = parsedData[0];
-      const statusIndex = headers.indexOf("NAME") - 1;
-      const nameIndex = headers.indexOf("NAME");
-      const mondayIndex = headers.indexOf("MONDAY");
-      const tuesdayIndex = headers.indexOf("TUESDAY");
-      const wednesdayIndex = headers.indexOf("WEDNESDAY");
-      const thursdayIndex = headers.indexOf("THURSDAY");
-      const fridayIndex = headers.indexOf("FRIDAY");
+        if (parsedData.length === 0) {
+          console.log("No data found in the sheet.");
+          return;
+        }
 
-      let cleanedData = parsedData
-        .slice(1)
-        .map((row) => ({
-          Status:
-            row[statusIndex] && typeof row[statusIndex] === "string"
-              ? row[statusIndex].trim()
-              : undefined,
-          Name:
-            row[nameIndex] && typeof row[nameIndex] === "string"
-              ? row[nameIndex].trim()
-              : undefined,
-          Monday:
-            row[mondayIndex] && typeof row[mondayIndex] === "string"
-              ? row[mondayIndex].trim()
-              : undefined,
-          Tuesday:
-            row[tuesdayIndex] && typeof row[tuesdayIndex] === "string"
-              ? row[tuesdayIndex].trim()
-              : undefined,
-          Wednesday:
-            row[wednesdayIndex] && typeof row[wednesdayIndex] === "string"
-              ? row[wednesdayIndex].trim()
-              : undefined,
-          Thursday:
-            row[thursdayIndex] && typeof row[thursdayIndex] === "string"
-              ? row[thursdayIndex].trim()
-              : undefined,
-          Friday:
-            row[fridayIndex] && typeof row[fridayIndex] === "string"
-              ? row[fridayIndex].trim()
-              : undefined,
-        }))
-        .filter(
+        // Detect headers by looking for the row that includes "NAME" or similar expected header
+        let headerRowIndex = 0;
+        for (let i = 0; i < parsedData.length; i++) {
+          const row = parsedData[i];
+          if (
+            row.some(
+              (cell) =>
+                cell &&
+                typeof cell === "string" &&
+                cell.toUpperCase().includes("NAME")
+            )
+          ) {
+            headerRowIndex = i;
+            break;
+          }
+        }
+
+        const headers = parsedData[headerRowIndex].map((header) =>
+          header.trim().toUpperCase()
+        );
+        console.log("Headers:", headers);
+
+        const statusIndex = headers.indexOf("STATUS");
+        const nameIndex = headers.indexOf("NAME");
+        const mondayIndex = headers.indexOf("MONDAY");
+        const tuesdayIndex = headers.indexOf("TUESDAY");
+        const wednesdayIndex = headers.indexOf("WEDNESDAY");
+        const thursdayIndex = headers.indexOf("THURSDAY");
+        const fridayIndex = headers.indexOf("FRIDAY");
+
+        console.log("Column indexes:", {
+          statusIndex,
+          nameIndex,
+          mondayIndex,
+          tuesdayIndex,
+          wednesdayIndex,
+          thursdayIndex,
+          fridayIndex,
+        });
+
+        let cleanedData = parsedData.slice(headerRowIndex + 1).map((row) => ({
+          Status: row[statusIndex]?.trim(),
+          Name: row[nameIndex]?.trim(),
+          Monday: row[mondayIndex]?.trim(),
+          Tuesday: row[tuesdayIndex]?.trim(),
+          Wednesday: row[wednesdayIndex]?.trim(),
+          Thursday: row[thursdayIndex]?.trim(),
+          Friday: row[fridayIndex]?.trim(),
+        }));
+
+        console.log("Cleaned data:", cleanedData);
+
+        cleanedData = cleanedData.filter(
           (row) =>
             row.Name &&
             row.Name.trim() !== "" &&
@@ -75,148 +109,157 @@ function WeekdayDutyShuffler() {
             row.Friday
         );
 
-      if (cleanedData.length === 0) {
+        console.log("Filtered data:", cleanedData);
+
+        if (cleanedData.length === 0) {
+          console.log("No valid data after filtering.");
+          return;
+        }
+
+        const initialStatus = cleanedData.reduce((acc, row) => {
+          acc[row.Name] = {
+            Monday: row.Monday,
+            Tuesday: row.Tuesday,
+            Wednesday: row.Wednesday,
+            Thursday: row.Thursday,
+            Friday: row.Friday,
+          };
+          return acc;
+        }, {});
+
+        console.log("Initial employee status:", initialStatus);
+
+        setEmployeeStatus(initialStatus);
+
+        const allDuties = {};
+        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].forEach(
+          (day) => {
+            allDuties[day] = [
+              ...new Set(cleanedData.map((row) => row[day])),
+            ].filter(Boolean);
+          }
+        );
+
+        console.log("Available duties by day:", allDuties);
+
+        setAvailableDuties(allDuties);
+        setData(cleanedData);
+      } catch (error) {
+        console.error("Error processing file:", error);
+      }
+    };
+
+    reader.onerror = (error) => {
+      console.error("File Reader Error:", error);
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleDutyChange = (name, day, newDuty) => {
+    if (newDuty === "HOLIDAY") {
+      setEmployeeStatus((prevStatus) => {
+        const updatedStatus = { ...prevStatus };
+        Object.keys(updatedStatus).forEach((employee) => {
+          updatedStatus[employee][day] = "HOLIDAY";
+        });
+        console.log(
+          "Updated status after setting HOLIDAY for everyone:",
+          updatedStatus
+        );
+        return updatedStatus;
+      });
+    } else if (newDuty === "Input") {
+      setEmployeeStatus((prevStatus) => {
+        const updatedStatus = { ...prevStatus };
+        const oldDuty = prevStatus[name][day];
+
+        console.log(`${name}'s old duty on ${day} was ${oldDuty}`);
+
+        const inputPeople = Object.keys(prevStatus)
+          .filter(
+            (employee) =>
+              prevStatus[employee][day] === "Input" && employee !== name
+          )
+          .sort();
+
+        if (inputPeople.length > 0) {
+          const nextInputPerson = inputPeople[0];
+
+          updatedStatus[name][day] = "Input";
+          updatedStatus[nextInputPerson][day] = oldDuty;
+        } else {
+          updatedStatus[name][day] = "Input";
+        }
+
+        return updatedStatus;
+      });
+    } else {
+      const oldDuty = employeeStatus[name][day];
+      if (oldDuty === newDuty) {
         return;
       }
 
-      const initialStatus = cleanedData.reduce((acc, row) => {
-        acc[row.Name] = {
-          Monday: row.Monday,
-          Tuesday: row.Tuesday,
-          Wednesday: row.Wednesday,
-          Thursday: row.Thursday,
-          Friday: row.Friday,
+      setEmployeeStatus((prevStatus) => {
+        const updatedStatus = {
+          ...prevStatus,
+          [name]: {
+            ...prevStatus[name],
+            [day]: newDuty,
+          },
         };
-        return acc;
-      }, {});
 
-      setEmployeeStatus(initialStatus);
-      setData(cleanedData);
-    };
-    reader.readAsBinaryString(file);
-  };
+        const affectedEmployee = Object.keys(updatedStatus).find(
+          (employee) =>
+            employee !== name && updatedStatus[employee][day] === newDuty
+        );
 
-  const handleStatusChange = (name, day, value) => {
-    setEmployeeStatus((prevStatus) => ({
-      ...prevStatus,
-      [name]: {
-        ...prevStatus[name],
-        [day]: value,
-      },
-    }));
-  };
+        if (affectedEmployee) {
+          updatedStatus[affectedEmployee][day] = oldDuty;
+        } else {
+          console.log(`${name} is now doing ${newDuty}. No swap needed.`);
+        }
 
-  const shuffleArray = (array) => {
-    for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [array[i], array[j]] = [array[j], array[i]];
+        return updatedStatus;
+      });
     }
-    return array;
   };
 
   const handleDownload = () => {
-    const scheduleData = data.map((row) => ({
-      ...row,
-      Monday: employeeStatus[row.Name]?.Monday || row.Monday,
-      Tuesday: employeeStatus[row.Name]?.Tuesday || row.Tuesday,
-      Wednesday: employeeStatus[row.Name]?.Wednesday || row.Wednesday,
-      Thursday: employeeStatus[row.Name]?.Thursday || row.Thursday,
-      Friday: employeeStatus[row.Name]?.Friday || row.Friday,
-    }));
+    // Sort data alphabetically by Name
+    const sortedData = [...data]
+      .map((row) => ({
+        ...row,
+        Monday: employeeStatus[row.Name]?.Monday || row.Monday,
+        Tuesday: employeeStatus[row.Name]?.Tuesday || row.Tuesday,
+        Wednesday: employeeStatus[row.Name]?.Wednesday || row.Wednesday,
+        Thursday: employeeStatus[row.Name]?.Thursday || row.Thursday,
+        Friday: employeeStatus[row.Name]?.Friday || row.Friday,
+        Status: employeeStatus[row.Name]?.Status || row.Status, // Ensure Status is included
+      }))
+      .sort((a, b) => a.Name.localeCompare(b.Name)); // Sort names in ascending order
 
-    const unchangedDuties = [
-      "HOLIDAY",
-      "OFF",
-      "FORKLIFT",
-      "TRUCK COORDINATION",
-      "BALLDECK/INPUT",
-      "ASSIST LEAD 1/2",
-      "ASSIST LEAD 3",
-      "BALLDECK/LOAD",
-      "LINE 1 ASSIST",
-      "LINE 2 ASSIST",
-      "LINE 3 ASSIST",
-      "TRIPS",
-    ];
-
-    const dutiesToShuffle = [
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-    ];
-
-    const dutiesMap = dutiesToShuffle.reduce((acc, day) => {
-      acc[day] = scheduleData
-        .map((row, index) => ({
-          duty: row[day],
-          index: index,
-        }))
-        .filter(
-          (item) =>
-            !unchangedDuties.includes(item.duty) &&
-            item.duty !== "Absent" &&
-            item.duty !== "Vacation"
-        );
-      return acc;
-    }, {});
-
-    dutiesToShuffle.forEach((day) => {
-      const shuffledDuties = shuffleArray(
-        dutiesMap[day].map((item) => item.duty)
-      );
-
-      // Ensure no employee gets the same duty two days in a row
-      for (let i = 0; i < dutiesMap[day].length; i++) {
-        const currentDuty = shuffledDuties[i];
-        const previousDayIndex = dutiesToShuffle.indexOf(day) - 1;
-
-        if (
-          previousDayIndex >= 0 &&
-          dutiesMap[dutiesToShuffle[previousDayIndex]].length > 0
-        ) {
-          const previousDayDuty =
-            scheduleData[dutiesMap[day][i].index][
-              dutiesToShuffle[previousDayIndex]
-            ];
-
-          // If the current duty matches the previous day's duty, reshuffle
-          if (currentDuty === previousDayDuty) {
-            let swapIndex = (i + 1) % shuffledDuties.length;
-            [shuffledDuties[i], shuffledDuties[swapIndex]] = [
-              shuffledDuties[swapIndex],
-              shuffledDuties[i],
-            ];
-          }
-        }
-
-        scheduleData[dutiesMap[day][i].index][day] = shuffledDuties[i];
-      }
-    });
-
-    const sortedData = scheduleData.sort((a, b) =>
-      a.Name.localeCompare(b.Name)
-    );
-
+    // Create worksheet with Status column
     const worksheet = XLSX.utils.json_to_sheet(sortedData);
 
-    // Set the width of the columns
+    // Set column widths
     const wscols = [
-      { wch: 10 }, // Status column width
-      { wch: 30 }, // Name column width
+      { wch: 20 }, // Name column width
       { wch: 30 }, // Monday column width
       { wch: 30 }, // Tuesday column width
       { wch: 30 }, // Wednesday column width
       { wch: 30 }, // Thursday column width
       { wch: 30 }, // Friday column width
+      { wch: 30 }, // Status column width
     ];
 
     worksheet["!cols"] = wscols;
 
+    // Create workbook
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Weekday Duties");
 
+    // Write to buffer and save file
     const excelBuffer = XLSX.write(workbook, {
       bookType: "xlsx",
       type: "array",
@@ -226,9 +269,49 @@ function WeekdayDutyShuffler() {
     saveAs(blob, "weekday_duties.xlsx");
   };
 
-  const filteredData = data
-    .filter((row) => row.Name.toLowerCase().includes(searchTerm.toLowerCase()))
-    .sort((a, b) => a.Name.localeCompare(b.Name)); // Sorting by name in ascending order
+  const calculateStats = (day) => {
+    let pushingCount = 0;
+    let loadingCount = 0;
+    let inputCount = 0;
+
+    Object.keys(employeeStatus).forEach((employee) => {
+      const duty = employeeStatus[employee][day]?.trim().toLowerCase();
+      console.log(`Employee: ${employee}, Duty on ${day}: '${duty}'`);
+
+      if (duty.includes("push")) {
+        pushingCount++;
+      } else if (duty.includes("load")) {
+        loadingCount++;
+      } else if (duty === "input") {
+        inputCount++;
+      }
+    });
+
+    console.log(
+      `Stats for ${day}: Pushing - ${pushingCount}, Loading - ${loadingCount}, Input - ${inputCount}`
+    );
+
+    return {
+      pushing: pushingCount,
+      loading: loadingCount,
+      input: inputCount,
+    };
+  };
+
+  const toggleStatsVisibility = (day) => {
+    setShowStats((prevState) => ({
+      ...prevState,
+      [day]: !prevState[day],
+    }));
+  };
+
+  const filteredData = useMemo(() => {
+    return data
+      .filter((row) =>
+        row.Name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .sort((a, b) => a.Name.localeCompare(b.Name)); // Sort names in ascending order
+  }, [data, searchTerm]);
 
   const currentDay = new Date().toLocaleString("en-us", { weekday: "long" });
   const quote =
@@ -256,11 +339,46 @@ function WeekdayDutyShuffler() {
             className="search-input"
           />
 
+          <div className="statistics">
+            {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map(
+              (day) => {
+                const stats = calculateStats(day);
+                return (
+                  <div key={day} className="day-stats-container">
+                    <button
+                      className="toggle-stats-btn"
+                      onClick={() => toggleStatsVisibility(day)}
+                    >
+                      {showStats[day] ? "−" : "+"} {day} Stats
+                    </button>
+                    {showStats[day] && (
+                      <div className="day-stats">
+                        <div className="stat-item">
+                          <strong>Pushing:</strong> {stats.pushing}
+                        </div>
+                        <div className="stat-item">
+                          <strong>Loading:</strong> {stats.loading}
+                        </div>
+                        <div className="stat-item">
+                          <strong>Input:</strong> {stats.input}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+            )}
+          </div>
+
           <div className="employee-list">
             {filteredData.length > 0 ? (
               filteredData.map((row) => (
                 <div key={row.Name} className="employee-card">
-                  <h3>{row.Name}</h3>
+                  <h3>
+                    {row.Name}{" "}
+                    {employeeStatus[row.Name].Status &&
+                      `(${employeeStatus[row.Name].Status})`}
+                  </h3>
                   {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map(
                     (day) => (
                       <div key={day} className="day-select">
@@ -268,13 +386,19 @@ function WeekdayDutyShuffler() {
                         <select
                           value={employeeStatus[row.Name][day]}
                           onChange={(e) =>
-                            handleStatusChange(row.Name, day, e.target.value)
+                            handleDutyChange(row.Name, day, e.target.value)
                           }
                           className="status-select"
                         >
-                          <option value={row[day]}>{row[day]}</option>
-                          <option value="Absent">Absent</option>
-                          <option value="Vacation">Vacation</option>
+                          <option value={employeeStatus[row.Name][day]}>
+                            {employeeStatus[row.Name][day]}
+                          </option>
+                          {availableDuties[day].map((duty) => (
+                            <option key={duty} value={duty}>
+                              {duty}
+                            </option>
+                          ))}
+                          <option value="HOLIDAY">HOLIDAY</option>
                         </select>
                       </div>
                     )

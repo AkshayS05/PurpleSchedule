@@ -4,7 +4,6 @@ import { useState } from "react";
 import "./DutyShuffler.css";
 
 function WeekendDutyShuffler({ onExcelUpload }) {
-  // Receiving the onExcelUpload prop
   const [weekendData, setWeekendData] = useState([]);
   const [employeeStatus, setEmployeeStatus] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
@@ -18,28 +17,23 @@ function WeekendDutyShuffler({ onExcelUpload }) {
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
 
-      // Parse the sheet into JSON
       let parsedData = XLSX.utils.sheet_to_json(sheet, {
         header: 1,
       });
 
-      // Extract headers
       const headers = parsedData[0];
-      parsedData = parsedData.slice(1); // Remove the header row
+      parsedData = parsedData.slice(1);
 
-      // Identify the indexes of relevant columns
       const nameIndex = headers.indexOf("Name");
       const saturdayIndex = headers.indexOf("Saturday");
       const sundayIndex = headers.indexOf("Sunday");
 
-      // Process the data to create objects with the correct keys
       const weekendData = parsedData.map((row) => ({
         Name: row[nameIndex]?.trim(),
         Saturday: row[saturdayIndex]?.trim(),
         Sunday: row[sundayIndex]?.trim(),
       }));
 
-      // Prepare the initial status state
       const initialStatus = weekendData.reduce((acc, row) => {
         acc[row.Name] = {
           Saturday: row.Saturday,
@@ -50,19 +44,31 @@ function WeekendDutyShuffler({ onExcelUpload }) {
 
       setEmployeeStatus(initialStatus);
       setWeekendData(weekendData);
-      onExcelUpload(true); // Call the onExcelUpload function to notify the parent component
+      onExcelUpload(true);
     };
     reader.readAsBinaryString(file);
   };
 
   const handleStatusChange = (name, day, value) => {
-    setEmployeeStatus((prevStatus) => ({
-      ...prevStatus,
-      [name]: {
-        ...prevStatus[name],
-        [day]: value,
-      },
-    }));
+    if (value === "HOLIDAY") {
+      // Apply HOLIDAY to all employees for the selected day
+      setEmployeeStatus((prevStatus) => {
+        const updatedStatus = { ...prevStatus };
+        Object.keys(updatedStatus).forEach((employee) => {
+          updatedStatus[employee][day] = "HOLIDAY";
+        });
+        return updatedStatus;
+      });
+    } else {
+      // Change the status for the selected employee and day
+      setEmployeeStatus((prevStatus) => ({
+        ...prevStatus,
+        [name]: {
+          ...prevStatus[name],
+          [day]: value,
+        },
+      }));
+    }
   };
 
   const shuffleArray = (array) => {
@@ -92,7 +98,6 @@ function WeekendDutyShuffler({ onExcelUpload }) {
 
     const dutiesToShuffle = ["Saturday", "Sunday"];
 
-    // Create a list of duties that need shuffling
     const dutiesMap = dutiesToShuffle.reduce((acc, day) => {
       acc[day] = scheduleData
         .map((row, index) => ({
@@ -108,7 +113,6 @@ function WeekendDutyShuffler({ onExcelUpload }) {
       return acc;
     }, {});
 
-    // Shuffle the duties within each day
     dutiesToShuffle.forEach((day) => {
       const shuffledDuties = shuffleArray(
         dutiesMap[day].map((item) => item.duty)
@@ -118,19 +122,13 @@ function WeekendDutyShuffler({ onExcelUpload }) {
       });
     });
 
-    // Sort the shuffled data by employee names in ascending order
     const sortedData = scheduleData.sort((a, b) =>
       a.Name.localeCompare(b.Name)
     );
 
     const worksheet = XLSX.utils.json_to_sheet(sortedData);
 
-    // Set the width of the columns
-    const wscols = [
-      { wch: 30 }, // Name column width
-      { wch: 30 }, // Saturday column width
-      { wch: 30 }, // Sunday column width
-    ];
+    const wscols = [{ wch: 30 }, { wch: 30 }, { wch: 30 }];
 
     worksheet["!cols"] = wscols;
 
@@ -148,7 +146,7 @@ function WeekendDutyShuffler({ onExcelUpload }) {
 
   const filteredData = weekendData
     .filter((row) => row.Name.toLowerCase().includes(searchTerm.toLowerCase()))
-    .sort((a, b) => a.Name.localeCompare(b.Name)); // Sorting by name in ascending order
+    .sort((a, b) => a.Name.localeCompare(b.Name));
 
   const currentDay = new Date().toLocaleString("en-us", { weekday: "long" });
   const quote =
@@ -191,9 +189,12 @@ function WeekendDutyShuffler({ onExcelUpload }) {
                         }
                         className="status-select"
                       >
-                        <option value={row[day]}>{row[day]}</option>
+                        <option value={employeeStatus[row.Name][day]}>
+                          {employeeStatus[row.Name][day]}
+                        </option>
                         <option value="Absent">Absent</option>
                         <option value="Vacation">Vacation</option>
+                        <option value="HOLIDAY">HOLIDAY</option>
                       </select>
                     </div>
                   ))}
