@@ -22,17 +22,7 @@ body {
   animation: fadeInDown 1s ease-in-out;
 }
 
-.file-input {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 20px;
-  border: none;
-  border-radius: 5px;
-  font-size: 1rem;
-  background-color: #d0b3ff;
-  color: #4b0082;
-}
-
+.file-input,
 .search-input {
   width: 100%;
   padding: 10px;
@@ -256,4 +246,110 @@ input:checked + .slider:before {
   flex: 1;
   padding: 5px;
   text-align: center;
+}
+
+/* Media Queries for Responsive Design */
+
+/* For tablets and larger smartphones */
+@media (max-width: 768px) {
+  .app-container {
+    padding: 20px;
+    max-width: 600px;
+  }
+
+  .app-title {
+    font-size: 2rem;
+  }
+
+  .employee-card {
+    width: calc(50% - 20px); /* Two cards per row */
+  }
+
+  .toggle-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .toggle-label {
+    margin-top: 10px;
+    font-size: 1rem;
+  }
+
+  .day-stats-container {
+    flex: 1 1 100%; /* Full width on smaller screens */
+  }
+}
+
+/* For smartphones */
+@media (max-width: 480px) {
+  .app-container {
+    padding: 15px;
+    max-width: 100%;
+  }
+
+  .app-title {
+    font-size: 1.8rem;
+  }
+
+  .employee-card {
+    width: 100%; /* Single card per row */
+  }
+
+  .toggle-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .switch {
+    width: 50px;
+    height: 28px;
+  }
+
+  .slider:before {
+    height: 22px;
+    width: 22px;
+  }
+
+  .toggle-label {
+    font-size: 0.9rem;
+    margin-left: 0;
+    margin-top: 10px;
+  }
+
+  .day-stats-container {
+    flex: 1 1 100%; /* Full width on smaller screens */
+  }
+
+  .download-button {
+    font-size: 1rem;
+    padding: 12px;
+  }
+}
+
+/* For very small devices */
+@media (max-width: 320px) {
+  .app-title {
+    font-size: 1.5rem;
+  }
+
+  .greeting-message {
+    font-size: 1.5rem;
+  }
+
+  .logo {
+    height: 3em;
+  }
+
+  .card {
+    padding: 1em;
+  }
+
+  .toggle-label {
+    font-size: 0.8rem;
+  }
+
+  .download-button {
+    font-size: 0.9rem;
+    padding: 10px;
+  }
 }
