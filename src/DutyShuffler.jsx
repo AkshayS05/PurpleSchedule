@@ -94,7 +94,7 @@ function DutyShuffler({
         Name: name,
         ...employeeStatus[name],
       }))
-      .sort((a, b) => a.Name.localeCompare(b.Name));
+      .sort((a, b) => a.Name.localeCompare(b.Name)); // Sort names in ascending order
 
     const worksheet = XLSX.utils.json_to_sheet(sortedData);
     const wscols = [{ wch: 20 }, ...dayNames.map(() => ({ wch: 30 }))];
@@ -104,13 +104,62 @@ function DutyShuffler({
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, `${title} Duties`);
 
+    // Generate filename with date range
+    const getFormattedDate = (date) => {
+      return date
+        .toLocaleString("en-us", {
+          day: "2-digit",
+          month: "short",
+        })
+        .replace(/ /g, "_");
+    };
+
+    const getUpcomingWeekendDates = () => {
+      const currentDate = new Date();
+      const nextSaturday = new Date(
+        currentDate.setDate(currentDate.getDate() + (6 - currentDate.getDay()))
+      );
+      const nextSunday = new Date(
+        currentDate.setDate(nextSaturday.getDate() + 1)
+      );
+      return [nextSaturday, nextSunday];
+    };
+
+    const getWeekdayRange = () => {
+      const currentDate = new Date();
+      const startDate = new Date(
+        currentDate.setDate(currentDate.getDate() - currentDate.getDay() + 1)
+      ); // Monday of the current week
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 4); // Friday of the current week
+      return [startDate, endDate];
+    };
+
+    let startDate, endDate;
+
+    if (title.toLowerCase() === "weekend") {
+      [startDate, endDate] = getUpcomingWeekendDates();
+    } else {
+      [startDate, endDate] = getWeekdayRange();
+    }
+
+    const startDateFormatted = getFormattedDate(startDate);
+    const endDateFormatted = getFormattedDate(endDate);
+
+    const filename = `${title
+      .toLowerCase()
+      .replace(
+        /\s+/g,
+        "_"
+      )}_duties_${startDateFormatted}_to_${endDateFormatted}.xlsx`;
+
     const excelBuffer = XLSX.write(workbook, {
       bookType: "xlsx",
       type: "array",
     });
     const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
 
-    saveAs(blob, `${title.toLowerCase().replace(/\s+/g, "_")}_duties.xlsx`);
+    saveAs(blob, filename);
   };
 
   const calculateStats = (day) => {
