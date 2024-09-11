@@ -40,9 +40,18 @@ function WeekendDutyShuffler() {
       }, {});
 
       setEmployeeStatus(initialStatus);
-      setAvailableDuties(initialStatus); // Adjust this as per the actual requirement
 
-      // Generate PST duties Excel sheet
+      // Extract unique duties for both days (Saturday and Sunday)
+      const allDuties = {
+        Saturday: [
+          ...new Set(weekendData.map((row) => row.Saturday).filter(Boolean)),
+        ],
+        Sunday: [
+          ...new Set(weekendData.map((row) => row.Sunday).filter(Boolean)),
+        ],
+      };
+
+      setAvailableDuties(allDuties);
       generatePSTDutiesSheet(Object.keys(initialStatus));
     };
     reader.readAsBinaryString(file);
@@ -71,7 +80,6 @@ function WeekendDutyShuffler() {
 
     const blankRow = { Name: "", Duty: "" }; // Blank row for spacing
 
-    // Order: Balldeck PST, blank row, Floor PST
     const pstData = [...balldeckPST, blankRow, ...floorPST];
 
     const worksheet = XLSX.utils.json_to_sheet(pstData);
@@ -96,7 +104,7 @@ function WeekendDutyShuffler() {
       title="Weekend"
       dayNames={["Saturday", "Sunday"]}
       onFileUpload={handleFileUpload}
-      availableDuties={availableDuties}
+      availableDuties={availableDuties} // Pass the available duties for Saturday and Sunday
       employeeStatus={employeeStatus}
       setEmployeeStatus={setEmployeeStatus}
       error={error}
