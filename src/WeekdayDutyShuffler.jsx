@@ -31,6 +31,8 @@ function WeekdayDutyShuffler() {
           return;
         }
 
+        console.log("Parsed data:", parsedData);
+
         let headerRowIndex = 0;
         for (let i = 0; i < parsedData.length; i++) {
           const row = parsedData[i];
@@ -102,6 +104,8 @@ function WeekdayDutyShuffler() {
             row.Friday
         );
 
+        console.log("Cleaned Data:", cleanedData);
+
         const initialStatus = cleanedData.reduce((acc, row) => {
           acc[row.Name] = {
             Monday: row.Monday,
@@ -113,6 +117,8 @@ function WeekdayDutyShuffler() {
           return acc;
         }, {});
 
+        console.log("Initial Employee Status:", initialStatus);
+
         setEmployeeStatus(initialStatus);
 
         const allDuties = {};
@@ -123,6 +129,8 @@ function WeekdayDutyShuffler() {
             ].filter(Boolean);
           }
         );
+
+        console.log("Available Duties:", allDuties);
 
         setAvailableDuties(allDuties);
       } catch (error) {

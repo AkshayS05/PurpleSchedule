@@ -27,68 +27,112 @@ function DutyShuffler({
     onFileUpload(e);
   };
 
-  const handleDutyChange = (name, day, newDuty) => {
-    if (newDuty === "HOLIDAY") {
-      setEmployeeStatus((prevStatus) => {
-        const updatedStatus = { ...prevStatus };
-        Object.keys(updatedStatus).forEach((employee) => {
-          updatedStatus[employee][day] = "HOLIDAY";
+  // List of duties that should remain fixed and not be shuffled
+  const exceptionDuties = [
+    "HOLIDAY",
+    "Absent",
+    "Vacation",
+    "VACATION",
+    "LINE 1 ASSIST",
+    "LINE 2 ASSIST",
+    "LINE 3 ASSIST",
+    "OFF",
+    "TRUCK COORDINATION",
+    "BALLDECK/INPUT",
+    "BALLDECK/LOAD",
+    "TRIPS",
+    "FORKLIFT",
+  ];
+
+  const shuffleDuties = () => {
+    const shuffledStatus = { ...employeeStatus };
+
+    dayNames.forEach((day) => {
+      // Check if any employee has "Vacation" for this day
+      const isVacationDay = Object.values(shuffledStatus).some(
+        (status) => status[day] === "Vacation"
+      );
+
+      if (isVacationDay) {
+        // If it's a vacation day for one, set "Vacation" for everyone for that day
+        Object.keys(shuffledStatus).forEach((name) => {
+          shuffledStatus[name][day] = "Vacation";
         });
-        return updatedStatus;
-      });
-    } else if (newDuty === "Input") {
-      setEmployeeStatus((prevStatus) => {
-        const updatedStatus = { ...prevStatus };
-        const oldDuty = prevStatus[name][day];
+      } else {
+        // Otherwise, shuffle the duties excluding "OFF", "Vacation", and other exceptions
+        const dutiesToShuffle = [];
+        const fixedDuties = {};
 
-        const inputPeople = Object.keys(prevStatus)
-          .filter(
-            (employee) =>
-              prevStatus[employee][day] === "Input" && employee !== name
-          )
-          .sort();
+        Object.keys(shuffledStatus).forEach((name) => {
+          const duty = shuffledStatus[name][day];
+          if (exceptionDuties.includes(duty)) {
+            fixedDuties[name] = duty; // Keep "OFF", "Holiday", etc.
+          } else {
+            dutiesToShuffle.push(duty); // Collect duties to shuffle
+          }
+        });
 
-        if (inputPeople.length > 0) {
-          const nextInputPerson = inputPeople[0];
-
-          updatedStatus[name][day] = "Input";
-          updatedStatus[nextInputPerson][day] = oldDuty;
-        } else {
-          updatedStatus[name][day] = "Input";
+        // Shuffle the duties that are not exceptions
+        for (let i = dutiesToShuffle.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [dutiesToShuffle[i], dutiesToShuffle[j]] = [
+            dutiesToShuffle[j],
+            dutiesToShuffle[i],
+          ];
         }
 
-        return updatedStatus;
-      });
-    } else {
-      const oldDuty = employeeStatus[name][day];
-      if (oldDuty === newDuty) {
-        return;
+        // Reassign the shuffled duties back to employees while keeping fixed duties unchanged
+        let dutyIndex = 0;
+        Object.keys(shuffledStatus).forEach((name) => {
+          if (fixedDuties[name]) {
+            shuffledStatus[name][day] = fixedDuties[name]; // Keep exceptions as they are
+          } else {
+            shuffledStatus[name][day] = dutiesToShuffle[dutyIndex++]; // Assign shuffled duty
+          }
+        });
+      }
+    });
+
+    console.log(
+      "Shuffled Employee Status (with exceptions preserved):",
+      shuffledStatus
+    );
+    setEmployeeStatus(shuffledStatus);
+  };
+
+  const handleDutyChange = (name, day, newDuty) => {
+    const oldDuty = employeeStatus[name][day];
+
+    // If the duty is in exception list, don't change it unless explicitly set by the user
+    if (exceptionDuties.includes(oldDuty) && oldDuty === newDuty) {
+      return; // Don't allow the shuffling to change these unless user manually changes them
+    }
+
+    setEmployeeStatus((prevStatus) => {
+      const updatedStatus = {
+        ...prevStatus,
+        [name]: {
+          ...prevStatus[name],
+          [day]: newDuty,
+        },
+      };
+
+      const affectedEmployee = Object.keys(updatedStatus).find(
+        (employee) =>
+          employee !== name && updatedStatus[employee][day] === newDuty
+      );
+
+      if (affectedEmployee) {
+        updatedStatus[affectedEmployee][day] = oldDuty;
       }
 
-      setEmployeeStatus((prevStatus) => {
-        const updatedStatus = {
-          ...prevStatus,
-          [name]: {
-            ...prevStatus[name],
-            [day]: newDuty,
-          },
-        };
-
-        const affectedEmployee = Object.keys(updatedStatus).find(
-          (employee) =>
-            employee !== name && updatedStatus[employee][day] === newDuty
-        );
-
-        if (affectedEmployee) {
-          updatedStatus[affectedEmployee][day] = oldDuty;
-        }
-
-        return updatedStatus;
-      });
-    }
+      return updatedStatus;
+    });
   };
 
   const handleDownload = () => {
+    shuffleDuties(); // Shuffle before downloading the duties
+
     const sortedData = Object.keys(employeeStatus)
       .map((name) => ({
         Name: name,
@@ -104,54 +148,7 @@ function DutyShuffler({
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, `${title} Duties`);
 
-    // Generate filename with date range
-    const getFormattedDate = (date) => {
-      return date
-        .toLocaleString("en-us", {
-          day: "2-digit",
-          month: "short",
-        })
-        .replace(/ /g, "_");
-    };
-
-    const getUpcomingWeekendDates = () => {
-      const currentDate = new Date();
-      const nextSaturday = new Date(
-        currentDate.setDate(currentDate.getDate() + (6 - currentDate.getDay()))
-      );
-      const nextSunday = new Date(
-        currentDate.setDate(nextSaturday.getDate() + 1)
-      );
-      return [nextSaturday, nextSunday];
-    };
-
-    const getWeekdayRange = () => {
-      const currentDate = new Date();
-      const startDate = new Date(
-        currentDate.setDate(currentDate.getDate() - currentDate.getDay() + 1)
-      ); // Monday of the current week
-      const endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 4); // Friday of the current week
-      return [startDate, endDate];
-    };
-
-    let startDate, endDate;
-
-    if (title.toLowerCase() === "weekend") {
-      [startDate, endDate] = getUpcomingWeekendDates();
-    } else {
-      [startDate, endDate] = getWeekdayRange();
-    }
-
-    const startDateFormatted = getFormattedDate(startDate);
-    const endDateFormatted = getFormattedDate(endDate);
-
-    const filename = `${title
-      .toLowerCase()
-      .replace(
-        /\s+/g,
-        "_"
-      )}_duties_${startDateFormatted}_to_${endDateFormatted}.xlsx`;
+    const filename = `${title.toLowerCase().replace(/\s+/g, "_")}_duties.xlsx`;
 
     const excelBuffer = XLSX.write(workbook, {
       bookType: "xlsx",
@@ -203,7 +200,6 @@ function DutyShuffler({
     <div className="app-container">
       <h2 className="greeting-message">Duty Shuffler - {title}</h2>
       <p className="inspiring-quote">"{randomQuote}"</p>{" "}
-      {/* Display the random quote */}
       <input
         type="file"
         accept=".xlsx, .xls"
