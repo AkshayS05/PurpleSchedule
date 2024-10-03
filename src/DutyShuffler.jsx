@@ -93,10 +93,6 @@ function DutyShuffler({
       }
     });
 
-    console.log(
-      "Shuffled Employee Status (with exceptions preserved):",
-      shuffledStatus
-    );
     setEmployeeStatus(shuffledStatus);
   };
 
